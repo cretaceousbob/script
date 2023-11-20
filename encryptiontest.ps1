@@ -7,15 +7,28 @@ Function Show-Test{
     Write-Host $testMessage
 }
 
-$numberOfCycles = 2
-$compressAlgo = "uncompressed"
+$numberOfCycles = 200
 $cycles = 0..($numberOfCycles-1)
+$compressAlgo = "uncompressed"
+$cipherAlgo = "AES","AES256","Camellia128","Camellia256","Blowfish","Twofish","3DES"
 Set-Clipboard $cycles
-$testTimesArray = (Get-Clipboard),(Get-Clipboard),(Get-Clipboard),(Get-Clipboard),(Get-Clipboard),(Get-Clipboard)
-$averageTimesArray = 0..5
-$testTypes = "Non-Encrypted Compression","Non-Encrypted Decompression","AES256 Encryption & Compression","AES256 Decryption & Decompression","3DES Encryption & Compression","3DES Decryption & Decompression"
-if ($compressAlgo = "uncompressed"){
-    $testTypes = $testTypes -replace "Non-Encrypted Compression","Non-Encrypted Container Pack" -replace "Non-Encrypted Decompression","Non-Encrypted Container Unpack" -replace " Compression" -replace " Decompression" -replace " &"
+$averageTimesArray = 0..(($cipherAlgo.Count * 2) + 1)
+$testTimesArray = 0..(($cipherAlgo.Count * 2) + 1)
+foreach ($cell in $averageTimesArray){
+    $testTimesArray[$cell] = Get-Clipboard
+}
+
+$testTypes = 0..(($cipherAlgo.Count * 2) + 1)
+$testTypes[0] = "Non-Encrypted Container Pack"
+$testTypes[1] = "Non-Encrypted Container Unpack"
+$skip = 0
+foreach ($cipher in $cipherAlgo){
+    $testTypes[($cipherAlgo.IndexOf($cipher))+2+$skip] = $cipher + " Encryption"
+    $testTypes[($cipherAlgo.IndexOf($cipher))+3+$skip] = $cipher + " Decryption"
+    $skip++
+}
+if ($compressAlgo -ne "uncompressed"){
+    $testTypes = $testTypes -replace "Non-Encrypted Container Pack","Non-Encrypted Compression" -replace "Non-Encrypted Container Unpack","Non-Encrypted Decompression" -replace " Encryption"," Encryption & Compression" -replace " Decryption"," Decryption & Decompression"
 }
 mkdir c:\test -ErrorAction SilentlyContinue | Out-Null
 $randomFile = new-object byte[] 1048576000; (new-object Random).NextBytes($randomFile); [IO.File]::WriteAllBytes('c:\test\test.bin', $randomFile)
@@ -33,30 +46,19 @@ foreach ($cycle in $cycles){
         & gpg.exe --output c:\test\test2.bin --quiet -d c:\test\test.bin.gpg
     }
     
-    Reset-Test
-    $currentTest++
-    Show-Test
-    $testTimesArray[$currentTest][$cycle] = Measure-Command{
-        & gpg.exe -c --cipher-algo AES256 --compress-algo $compressAlgo --allow-old-cipher-algos --passphrase password --batch --yes --quiet c:\test\test.bin
+    foreach ($cipher in $cipherAlgo){
+        Reset-Test
+        $currentTest++
+        Show-Test
+        $testTimesArray[$currentTest][$cycle] = Measure-Command{
+            & gpg.exe -c --cipher-algo $cipher --compress-algo $compressAlgo --allow-old-cipher-algos --passphrase password --batch --yes --quiet --no-tty c:\test\test.bin 2>C:\test\test.log
+        }
+        $currentTest++
+        Show-Test
+        $testTimesArray[$currentTest][$cycle] = Measure-Command{
+            & gpg.exe --output c:\test\test2.bin --passphrase password --batch --yes --quiet -d c:\test\test.bin.gpg 
+        }
     }
-    $currentTest++
-    Show-Test
-    $testTimesArray[$currentTest][$cycle] = Measure-Command{
-        & gpg.exe --output c:\test\test2.bin --passphrase password --batch --yes --quiet -d c:\test\test.bin.gpg 
-    }
-
-    Reset-Test
-    $currentTest++
-    Show-Test
-    $testTimesArray[$currentTest][$cycle] = Measure-Command{
-        & gpg.exe -c --cipher-algo 3DES --compress-algo $compressAlgo --allow-old-cipher-algos --passphrase password --batch --yes --quiet c:\test\test.bin 2>C:\test\test.log
-    }
-    $currentTest++
-    Show-Test
-    $testTimesArray[$currentTest][$cycle] = Measure-Command{
-        & gpg.exe --output c:\test\test2.bin --passphrase password --batch --yes --quiet -d c:\test\test.bin.gpg 
-    }
-    Reset-Test
 }
 Remove-Item c:\test -Recurse -Force
 
