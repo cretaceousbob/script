@@ -4,11 +4,14 @@ Function Reset-Test{
 }
 Function Show-Test{
     $testMessage = "Running " + $testTypes[$currentTest] + " Test #" + ($cycle + 1) + "..."
+    $logMessage = "$date" + " $testMessage"
     Write-Host $testMessage
+    Add-Content -path C:\encryptionbenchmark\log.txt -value $logMessage
 }
 
-$numberOfCycles = 200
+$numberOfCycles = 2000
 $cycles = 0..($numberOfCycles-1)
+$date = Get-Date
 $compressAlgo = "uncompressed"
 $cipherAlgo = "AES","AES256","Camellia128","Camellia256","Blowfish","Twofish","3DES"
 Set-Clipboard $cycles
@@ -31,6 +34,7 @@ if ($compressAlgo -ne "uncompressed"){
     $testTypes = $testTypes -replace "Non-Encrypted Container Pack","Non-Encrypted Compression" -replace "Non-Encrypted Container Unpack","Non-Encrypted Decompression" -replace " Encryption"," Encryption & Compression" -replace " Decryption"," Decryption & Decompression"
 }
 mkdir c:\test -ErrorAction SilentlyContinue | Out-Null
+mkdir C:\encryptionbenchmark -ErrorAction SilentlyContinue | Out-Null
 $randomFile = new-object byte[] 1048576000; (new-object Random).NextBytes($randomFile); [IO.File]::WriteAllBytes('c:\test\test.bin', $randomFile)
 
 foreach ($cycle in $cycles){
@@ -62,14 +66,17 @@ foreach ($cycle in $cycles){
 }
 Remove-Item c:\test -Recurse -Force
 
-Write-Host
-Write-Host "Average Time in Milliseconds:"
+$averageHeader = "$date" + " Average Time in Milliseconds:`n"
+Write-Host $averageHeader
+Add-Content -path C:\encryptionbenchmark\log.txt -value $averageHeader
 $i = 0
 foreach ($array in $testTimesArray){
     $i += 0 
     $averageTimesArray[$i] = ($testTimesArray[$i].TotalMilliseconds | Measure-Object -Average).Average
-    Write-Host $testTypes[$i] -NoNewLine
-    Write-Host ":"
+    $averageMessage = "$date " + $testTypes[$i] + ":"
+    Write-Host $averageMessage
     $averageTimesArray[$i]
+    Add-Content -path C:\encryptionbenchmark\log.txt -value $averageMessage
+    Add-Content -path C:\encryptionbenchmark\log.txt -value $averageTimesArray[$i]
     $i++
 }
